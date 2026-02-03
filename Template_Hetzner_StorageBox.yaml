@@ -1,0 +1,256 @@
+zabbix_export:
+  version: '7.2'
+
+  template_groups:
+    - uuid: 7a1c2e3f4b5c4d6e8f90123456789abc
+      name: 'Templates/Storage'
+
+  templates:
+    - uuid: 12345678abcd4ef089ab0123456789ab
+      template: 'Template_Hetzner_StorageBox'
+      name: 'Template Hetzner StorageBox'
+      description: |
+        Hetzner Storage Box usage monitoring via SFTP command 'df -h' (password auth, sshpass).
+        Master External check returns JSON -> dependent items via JSONPath.
+        Script returns *_mb as MiB; template converts MiB -> bytes via multiplier 1048576.
+
+        Required host macros:
+          {$SB_HOST} - u12345.your-storagebox.de
+          {$SB_USER} - u12345
+          {$SB_PASS} - Secret password
+
+        Optional host macros:
+          {$SB_PORT} - default 22
+          {$SB_WARN} - default 85
+          {$SB_HIGH} - default 95
+
+        External script required on Zabbix Server (ExternalScripts dir):
+          storagebox_df_json.sh
+      vendor:
+        name: 'Custom'
+        version: '3.0'
+      groups:
+        - name: 'Templates/Storage'
+
+      macros:
+        - macro: '{$SB_PORT}'
+          value: '22'
+          description: 'StorageBox SFTP port'
+        - macro: '{$SB_WARN}'
+          value: '85'
+          description: 'Warning threshold (percent used)'
+        - macro: '{$SB_HIGH}'
+          value: '95'
+          description: 'High threshold (percent used)'
+        - macro: '{$SB_PASS}'
+          type: SECRET_TEXT
+          value: ''
+          description: 'StorageBox password (required)'
+
+      items:
+        - uuid: 8a7b6c5d1a2b4c9f8a1b2c3d4e5f6071
+          name: 'StorageBox: DF JSON (master)'
+          type: EXTERNAL
+          key: 'storagebox_df_json.sh["{$SB_USER}","{$SB_HOST}","{$SB_PORT}","/","{$SB_PASS}"]'
+          delay: 10m
+          value_type: TEXT
+          description: 'Returns JSON: {ok,error,total_mb,used_mb,free_mb,pused}'
+          tags:
+            - tag: 'component'
+              value: 'storage'
+            - tag: 'vendor'
+              value: 'hetzner'
+            - tag: 'service'
+              value: 'storagebox'
+            - tag: 'class'
+              value: 'raw'
+
+        - uuid: 9b8c7d6e2b3c4d1a8b2c3d4e5f607182
+          name: 'StorageBox: OK'
+          type: DEPENDENT
+          key: 'storagebox.ok'
+          value_type: UNSIGNED
+          master_item:
+            key: 'storagebox_df_json.sh["{$SB_USER}","{$SB_HOST}","{$SB_PORT}","/","{$SB_PASS}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.ok'
+          tags:
+            - tag: 'component'
+              value: 'storage'
+            - tag: 'vendor'
+              value: 'hetzner'
+            - tag: 'service'
+              value: 'storagebox'
+            - tag: 'class'
+              value: 'status'
+
+        - uuid: a1b2c3d44d5e4f2a8c3d4e5f60718293
+          name: 'StorageBox: Error'
+          type: DEPENDENT
+          key: 'storagebox.error'
+          value_type: TEXT
+          master_item:
+            key: 'storagebox_df_json.sh["{$SB_USER}","{$SB_HOST}","{$SB_PORT}","/","{$SB_PASS}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.error'
+          tags:
+            - tag: 'component'
+              value: 'storage'
+            - tag: 'vendor'
+              value: 'hetzner'
+            - tag: 'service'
+              value: 'storagebox'
+            - tag: 'class'
+              value: 'status'
+
+        - uuid: b2c3d4e55e6f4a3b8d4e5f60718293a4
+          name: 'StorageBox: Used percent'
+          type: DEPENDENT
+          key: 'storagebox.pused'
+          value_type: UNSIGNED
+          units: '%'
+          master_item:
+            key: 'storagebox_df_json.sh["{$SB_USER}","{$SB_HOST}","{$SB_PORT}","/","{$SB_PASS}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.pused'
+          tags:
+            - tag: 'component'
+              value: 'storage'
+            - tag: 'vendor'
+              value: 'hetzner'
+            - tag: 'service'
+              value: 'storagebox'
+            - tag: 'class'
+              value: 'capacity'
+
+        - uuid: c3d4e5f66f704b4c8e5f60718293a4b5
+          name: 'StorageBox: Used'
+          type: DEPENDENT
+          key: 'storagebox.used_bytes'
+          value_type: UNSIGNED
+          units: 'B'
+          master_item:
+            key: 'storagebox_df_json.sh["{$SB_USER}","{$SB_HOST}","{$SB_PORT}","/","{$SB_PASS}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.used_mb'
+            - type: MULTIPLIER
+              parameters:
+                - '1048576'
+          tags:
+            - tag: 'component'
+              value: 'storage'
+            - tag: 'vendor'
+              value: 'hetzner'
+            - tag: 'service'
+              value: 'storagebox'
+            - tag: 'class'
+              value: 'capacity'
+
+        - uuid: d4e5f60781924c5d8f60718293a4b5c6
+          name: 'StorageBox: Free'
+          type: DEPENDENT
+          key: 'storagebox.free_bytes'
+          value_type: UNSIGNED
+          units: 'B'
+          master_item:
+            key: 'storagebox_df_json.sh["{$SB_USER}","{$SB_HOST}","{$SB_PORT}","/","{$SB_PASS}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.free_mb'
+            - type: MULTIPLIER
+              parameters:
+                - '1048576'
+          tags:
+            - tag: 'component'
+              value: 'storage'
+            - tag: 'vendor'
+              value: 'hetzner'
+            - tag: 'service'
+              value: 'storagebox'
+            - tag: 'class'
+              value: 'capacity'
+
+        - uuid: e5f6071892a34d6e80718293a4b5c6d7
+          name: 'StorageBox: Total'
+          type: DEPENDENT
+          key: 'storagebox.total_bytes'
+          value_type: UNSIGNED
+          units: 'B'
+          master_item:
+            key: 'storagebox_df_json.sh["{$SB_USER}","{$SB_HOST}","{$SB_PORT}","/","{$SB_PASS}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - '$.total_mb'
+            - type: MULTIPLIER
+              parameters:
+                - '1048576'
+          tags:
+            - tag: 'component'
+              value: 'storage'
+            - tag: 'vendor'
+              value: 'hetzner'
+            - tag: 'service'
+              value: 'storagebox'
+            - tag: 'class'
+              value: 'capacity'
+
+  graphs:
+    - uuid: 293aa4b5c6d7481c8db5c6d7e8f9a0b1
+      name: 'StorageBox: Used %'
+      ymin_type_1: FIXED
+      ymax_type_1: FIXED
+      yaxismin: '0'
+      yaxismax: '100'
+      graph_items:
+        - color: 'F63100'
+          item:
+            host: 'Template_Hetzner_StorageBox'
+            key: 'storagebox.pused'
+          drawtype: GRADIENT_LINE
+
+    - uuid: 393ba5c6d7e8491d9dc7d8e9f0a1b2c3
+      name: 'StorageBox: Capacity'
+      ymin_type_1: FIXED
+      ymax_type_1: ITEM
+      yaxismin: '0'
+      ymax_item_1:
+        host: 'Template_Hetzner_StorageBox'
+        key: 'storagebox.total_bytes'
+      graph_items:
+        - color: '2774A4'
+          item:
+            host: 'Template_Hetzner_StorageBox'
+            key: 'storagebox.total_bytes'
+          drawtype: BOLD_LINE
+        - color: '1A7C11'
+          item:
+            host: 'Template_Hetzner_StorageBox'
+            key: 'storagebox.used_bytes'
+          drawtype: FILLED_REGION
+
+  triggers:
+    - uuid: f6071892a3b44e7f8a8293a4b5c6d7e8
+      name: 'StorageBox: Collector error'
+      expression: 'last(/Template_Hetzner_StorageBox/storagebox.ok)=0'
+      priority: AVERAGE
+      description: 'Master item returned ok=0; check StorageBox: Error / connectivity / credentials.'
+
+    - uuid: 0718293aa4b54f0a8b93a4b5c6d7e8f9
+      name: 'StorageBox: Usage > {$SB_WARN}%'
+      expression: 'last(/Template_Hetzner_StorageBox/storagebox.pused)>{$SB_WARN}'
+      priority: WARNING
+
+    - uuid: 18293aa4b5c6401b8ca4b5c6d7e8f9a0
+      name: 'StorageBox: Usage > {$SB_HIGH}%'
+      expression: 'last(/Template_Hetzner_StorageBox/storagebox.pused)>{$SB_HIGH}'
+      priority: HIGH
