@@ -89,8 +89,8 @@ set -euo pipefail
 #    1.0TB    744GB    280GB    280GB          72%
 #
 # Args:
-#  1: user (e.g., u454424)
-#  2: host (e.g., u454424.your-storagebox.de)
+#  1: user (e.g., u12345)
+#  2: host (e.g., u12345.your-storagebox.de)
 #  3: port (default 22)
 #  4: path (kept for compatibility; not used by df -h output here) default /
 #  5: password (required)
